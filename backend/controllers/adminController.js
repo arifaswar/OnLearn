@@ -1,6 +1,7 @@
 import { comparePassword, hashPassword } from '../helpers/bcrypt.js';
 import { signToken } from '../helpers/jwt.js';
 import Admin from '../models/Admin.js';
+import Student from '../models/student.js';
 
 class AdminController {
   static async adminRegister(req, res) {
@@ -56,13 +57,13 @@ class AdminController {
     }
   }
 
-  static async getUser(req, res) {
+  static async getStudent(req, res) {
     try {
       // res.json('getUser')
-      const users = await User.find().select("-password");
+      const students = await Student.find().select("-password");
       res.status(200).json({
-        message: "All users",
-        users,
+        message: "All Student",
+        students,
       });
     } catch (error) {
       console.log(error);
@@ -73,14 +74,14 @@ class AdminController {
     try {
       const { id } = req.params;
       // console.log(id);
-      const user = await User.findOne({userId: id}).select('-password');
+      const student = await Student.findOne({userId: id}).select('-password');
     //   console.log(user);
-      if (!user) {
+      if (!student) {
         return res.status(404).json({ message: "User not found" });
       };
 
       res.status(200).json({
-        user
+        student
       })
     } catch (error) {
       console.log(error);
