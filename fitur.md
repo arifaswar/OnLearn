@@ -338,3 +338,182 @@ Selasa
 
 Slot = “kotak kecil” di dalam kalender
 Schedule = “keseluruhan kalender minggu itu”.
+
+
+
+
+Oke, kita buat BookingController dengan alur:
+
+Siswa cari guru
+
+Bisa filter subject, lokasi terdekat, dan hari dari slot Schedule.
+
+Lokasi kita hitung pakai koordinat (lat, lng) dengan rumus Haversine distance.
+
+Hanya ambil slot yang status: available.
+
+Siswa booking slot guru
+
+Input: teacherId, scheduleId, slotId, mode.
+
+Server cek apakah slot masih available.
+
+Hitung harga (amount) berdasarkan mode (online/offline).
+
+Simpan ke Booking + update Schedule.slots.status = occupied.
+
+📌 Controller bookingController.js
+import Booking from "../models/Booking.js";
+import Teacher from "../models/Teacher.js";
+import Schedule from "../models/Schedule.js";
+
+// ===== Helper untuk hitung jarak (km) =====
+function getDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// 1. Siswa cari guru berdasarkan filter
+export const searchTeachers = async (req, res) => {
+  try {
+    const { subject, day, lat, lng, maxDistance } = req.query;
+
+    // cari guru sesuai subject
+    let query = {};
+    if (subject) query.subject = { $in: [subject] };
+
+    const teachers = await Teacher.find(query);
+
+    let results = [];
+    for (let teacher of teachers) {
+      // cek jarak (jika lat lng dikirim)
+      if (lat && lng && teacher.location?.coordinates) {
+        const dist = getDistance(
+          parseFloat(lat),
+          parseFloat(lng),
+          teacher.location.coordinates.lat,
+          teacher.location.coordinates.lng
+        );
+        if (maxDistance && dist > maxDistance) continue; // skip kalau terlalu jauh
+        teacher = teacher.toObject();
+        teacher.distance = dist.toFixed(2);
+      }
+
+      // ambil schedule guru + filter slot sesuai hari
+      const schedules = await Schedule.find({ teacher: teacher._id });
+      let availableSlots = [];
+      for (let s of schedules) {
+        const slots = s.slots.filter(
+          (slot) =>
+            slot.status === "available" &&
+            (!day || slot.day.toLowerCase() === day.toLowerCase())
+        );
+        if (slots.length) {
+          availableSlots.push({ scheduleId: s._id, slots });
+        }
+      }
+
+      if (availableSlots.length) {
+        results.push({ teacher, availableSlots });
+      }
+    }
+
+    res.json(results);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// 2. Siswa booking slot guru
+export const bookSlot = async (req, res) => {
+  try {
+    const studentId = req.user.id; // siswa login
+    const { teacherId, scheduleId, slotId, mode } = req.body;
+
+    // cek guru
+    const teacher = await Teacher.findById(teacherId);
+    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+
+    // cek schedule
+    const schedule = await Schedule.findOne({ _id: scheduleId, teacher: teacherId });
+    if (!schedule) return res.status(404).json({ message: "Schedule not found" });
+
+    // cek slot
+    const slot = schedule.slots.find((s) => s.slotId === slotId);
+    if (!slot || slot.status !== "available") {
+      return res.status(400).json({ message: "Slot not available" });
+    }
+
+    // hitung harga
+    const amount = mode === "offline" ? teacher.priceOffline : teacher.priceOnline;
+    const adminFee = amount * 0.1; // contoh 10% fee
+    const teacherAmount = amount - adminFee;
+
+    // buat booking
+    const booking = new Booking({
+      student: studentId,
+      teacher: teacherId,
+      schedule: scheduleId,
+      slotId,
+      mode,
+      amount,
+      adminFee,
+      teacherAmount,
+    });
+
+    await booking.save();
+
+    // update slot jadi occupied
+    slot.status = "occupied";
+    await schedule.save();
+
+    res.status(201).json({ message: "Booking successful", booking });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+📌 Routes bookingRoutes.js
+import express from "express";
+import { searchTeachers, bookSlot } from "../controllers/bookingController.js";
+import { authStudent } from "../middleware/auth.js";
+
+const router = express.Router();
+
+// siswa cari guru
+// contoh: GET /api/bookings/search?subject=math&day=monday&lat=-6.2&lng=106.8&maxDistance=10
+router.get("/search", authStudent, searchTeachers);
+
+// siswa booking slot
+router.post("/", authStudent, bookSlot);
+
+export default router;
+
+📌 Alur Use Case
+
+Siswa mencari guru
+GET /api/bookings/search?subject=math&day=monday&lat=-6.2&lng=106.8&maxDistance=10
+→ server kembalikan daftar guru + slot available.
+
+Siswa booking slot
+POST /api/bookings
+Body:
+
+{
+  "teacherId": "66f3...",
+  "scheduleId": "66f4...",
+  "slotId": "123e4567",
+  "mode": "online"
+}
+
+
+→ server buat booking + update slot jadi occupied.

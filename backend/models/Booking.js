@@ -10,7 +10,7 @@ const BookingSchema = new mongoose.Schema({
   paymentStatus: {
     type: String,
     enum: ["paid", "released", "refunded"],
-    default: "paid",
+    // default: "paid",
   },
   status: {
     type: String,
