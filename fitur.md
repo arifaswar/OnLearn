@@ -231,3 +231,110 @@ Backend = REST API (Node.js + Express + MongoDB)
 Frontend Web (Admin) = manajemen data
 
 Frontend Mobile (User) = pengajar & siswa interaksi
+
+
+
+
+🔹 1. Konsep Schedule
+
+Schedule di sini adalah jadwal milik seorang guru (teacher) dalam periode tertentu, misalnya 1 minggu.
+
+Satu schedule terkait langsung dengan 1 guru.
+
+Schedule bisa disusun per minggu (weekStart → kapan awal minggu itu dimulai, misalnya Senin 2025-09-22).
+
+Di dalam schedule ini ada kumpulan slot.
+
+🔹 2. Konsep Slot
+
+Slot adalah bagian terkecil dari jadwal — bisa dianggap sebagai 1 sesi waktu yang bisa dipakai untuk booking.
+
+Contoh: Hari Senin jam 08:00 – 09:30 → ini satu slot.
+
+Slot selalu memiliki status:
+
+"available" → artinya bisa dipesan siswa.
+
+"occupied" → artinya sudah ada siswa yang booking.
+
+Setiap slot punya slotId (unik, bisa auto-generate misalnya pakai UUID).
+
+Slot juga punya day, start, dan end supaya mudah dibaca manusia.
+
+🔹 3. Hubungan Schedule ↔ Slot
+
+Schedule adalah kumpulan slot untuk satu guru dalam 1 minggu.
+
+Misalnya guru A punya jadwal minggu ini (weekStart = 2025-09-22), maka di dalam schedule itu ada banyak slot:
+
+{
+  "teacher": "teacherId123",
+  "weekStart": "2025-09-22",
+  "slots": [
+    {
+      "id": 1,
+      "day": "monday",
+      "start": "08:00",
+      "end": "09:30",
+      "status": "available"
+    },
+    {
+      "id": 2,
+      "day": "monday",
+      "start": "10:00",
+      "end": "11:30",
+      "status": "occupied"
+    }
+  ]
+}
+
+🔹 4. Alur Penggunaan
+
+Mari kita breakdown alurnya dalam aplikasi:
+
+(1) Guru membuat jadwal (schedule)
+
+Guru menginput jadwalnya (hari & jam yang tersedia).
+
+Backend akan membuat 1 Schedule document untuk minggu itu.
+
+Lalu sistem generate beberapa slot berdasarkan input guru.
+
+(2) Siswa melihat jadwal
+
+Siswa bisa melihat daftar slot yang masih "available" dari schedule guru.
+
+Misalnya: Senin jam 08:00 – 09:30 masih kosong.
+
+(3) Siswa booking slot
+
+Siswa memilih slot tertentu (slotId).
+
+Sistem update status slot dari "available" → "occupied".
+
+Bisa juga dibuat relasi dengan Booking model untuk mencatat siapa yang ambil slot itu.
+
+(4) Manajemen jadwal guru
+
+Guru bisa lihat jadwalnya, tahu slot mana yang sudah penuh (occupied) dan mana yang kosong (available).
+
+Bisa menambah slot baru atau menghapus slot lama.
+
+🔹 5. Ilustrasi Sederhana
+
+Bayangkan seperti kalender mingguan:
+
+📅 Schedule Minggu 22 – 28 Sept 2025 untuk Guru Budi
+
+Senin
+
+08:00 – 09:30 → available
+
+10:00 – 11:30 → occupied (sudah dibooking Andi)
+
+Selasa
+
+13:00 – 14:30 → available
+
+Slot = “kotak kecil” di dalam kalender
+Schedule = “keseluruhan kalender minggu itu”.

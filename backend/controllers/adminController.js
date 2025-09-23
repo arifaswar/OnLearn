@@ -2,6 +2,7 @@ import { comparePassword, hashPassword } from '../helpers/bcrypt.js';
 import { signToken } from '../helpers/jwt.js';
 import Admin from '../models/Admin.js';
 import Student from '../models/student.js';
+import Teacher from '../models/Teacher.js';
 
 class AdminController {
   static async adminRegister(req, res) {
@@ -70,7 +71,7 @@ class AdminController {
     }
   }
 
-  static async getUserById(req, res) {
+  static async getStudentById(req, res) {
     try {
       const { id } = req.params;
       // console.log(id);
@@ -85,6 +86,36 @@ class AdminController {
       })
     } catch (error) {
       console.log(error);
+    }
+  };
+
+  static async getTeacher(req, res) {
+    try {
+      const teachers = await Teacher.find().select("-password");
+      res.status(200).json({
+        message: "All teachers",
+        teachers
+      })
+    } catch (error) {
+      console.log(error);
+      
+    }
+  };
+
+  static async getTeacherById(req, res) {
+    try {
+      const {id} = req.params;
+      // console.log(id);
+      const teacher = await Teacher.findOne({userId: id}).select("-password");
+
+      res.status(200).json({
+        message: 'Success get teacher',
+        teacher: teacher
+      })
+      
+    } catch (error) {
+      console.log(error);
+      
     }
   }
 }
